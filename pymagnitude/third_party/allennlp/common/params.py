@@ -5,29 +5,30 @@ logging and validation.
 """
 
 
-
 from __future__ import with_statement
 from __future__ import absolute_import
-#typing
-from collections import MutableMapping, OrderedDict
+# typing
+# from collections import MutableMapping, OrderedDict
+from collections import OrderedDict
+from collections.abc import MutableMapping
 import copy
 import json
 import logging
 import os
 
-#overrides
+# overrides
 from io import open
 
 # _jsonnet doesn't work on Windows, so we have to use fakes.
 try:
     from _jsonnet import evaluate_file, evaluate_snippet
 except ImportError:
-    def evaluate_file(filename     , **_kwargs)       :
+    def evaluate_file(filename, **_kwargs):
         logger.warning("_jsonnet not loaded, treating {filename} as json")
         with open(filename, u'r') as evaluation_file:
             return evaluation_file.read()
 
-    def evaluate_snippet(_filename     , expr     , **_kwargs)       :
+    def evaluate_snippet(_filename, expr, **_kwargs):
         logger.warning("_jsonnet not loaded, treating snippet as json")
         return expr
 
@@ -37,14 +38,14 @@ from allennlp.common.file_utils import cached_path
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
-def unflatten(flat_dict                )                  :
+def unflatten(flat_dict):
     u"""
     Given a "flattened" dict with compound keys, e.g.
         {"a.b": 0}
     unflatten it:
         {"a": {"b": 0}}
     """
-    unflat                 = {}
+    unflat = {}
 
     for compound_key, value in list(flat_dict.items()):
         curr_dict = unflat
@@ -65,7 +66,8 @@ def unflatten(flat_dict                )                  :
 
     return unflat
 
-def with_fallback(preferred                , fallback                )                  :
+
+def with_fallback(preferred, fallback):
     u"""
     Deep merge two dicts, preferring values from `preferred`.
     """
@@ -73,7 +75,7 @@ def with_fallback(preferred                , fallback                )          
     fallback_keys = set(fallback.keys())
     common_keys = preferred_keys & fallback_keys
 
-    merged                 = {}
+    merged = {}
 
     for key in preferred_keys - fallback_keys:
         merged[key] = copy.deepcopy(preferred[key])
@@ -91,7 +93,8 @@ def with_fallback(preferred                , fallback                )          
 
     return merged
 
-def parse_overrides(serialized_overrides     )                  :
+
+def parse_overrides(serialized_overrides):
     if serialized_overrides:
         ext_vars = dict(os.environ)
         return unflatten(json.loads(evaluate_snippet(u"", serialized_overrides, ext_vars=ext_vars)))
@@ -127,16 +130,16 @@ class Params(MutableMapping):
     DEFAULT = object()
 
     def __init__(self,
-                 params                ,
-                 history      = u"",
-                 loading_from_archive       = False,
-                 files_to_archive                 = None)        :
+                 params,
+                 history=u"",
+                 loading_from_archive=False,
+                 files_to_archive=None):
         self.params = _replace_none(params)
         self.history = history
         self.loading_from_archive = loading_from_archive
         self.files_to_archive = {} if files_to_archive is None else files_to_archive
 
-    def add_file_to_archive(self, name     )        :
+    def add_file_to_archive(self, name):
         u"""
         Any class in its ``from_params`` method can request that some of its
         input files be added to the archive by calling this method.
@@ -159,10 +162,11 @@ class Params(MutableMapping):
         If the ``loading_from_archive`` flag is True, this will be a no-op.
         """
         if not self.loading_from_archive:
-            self.files_to_archive["{self.history}{name}"] = cached_path(self.get(name))
+            self.files_to_archive["{self.history}{name}"] = cached_path(
+                self.get(name))
 
-    #overrides
-    def pop(self, key     , default      = DEFAULT)       :
+    # overrides
+    def pop(self, key, default=DEFAULT):
         u"""
         Performs the functionality associated with dict.pop(key), along with checking for
         returned dictionaries, replacing them with Param objects with an updated history.
@@ -174,14 +178,16 @@ class Params(MutableMapping):
             try:
                 value = self.params.pop(key)
             except KeyError:
-                raise ConfigurationError(u"key \"{}\" is required at location \"{}\"".format(key, self.history))
+                raise ConfigurationError(
+                    u"key \"{}\" is required at location \"{}\"".format(key, self.history))
         else:
             value = self.params.pop(key, default)
         if not isinstance(value, dict):
-            logger.info(self.history + key + u" = " + unicode(value))  # type: ignore
+            logger.info(self.history + key + u" = " +
+                        unicode(value))  # type: ignore
         return self._check_is_dict(key, value)
 
-    def pop_int(self, key     , default      = DEFAULT)       :
+    def pop_int(self, key, default=DEFAULT):
         u"""
         Performs a pop and coerces to an int.
         """
@@ -191,7 +197,7 @@ class Params(MutableMapping):
         else:
             return int(value)
 
-    def pop_float(self, key     , default      = DEFAULT)         :
+    def pop_float(self, key, default=DEFAULT):
         u"""
         Performs a pop and coerces to a float.
         """
@@ -201,7 +207,7 @@ class Params(MutableMapping):
         else:
             return float(value)
 
-    def pop_bool(self, key     , default      = DEFAULT)        :
+    def pop_bool(self, key, default=DEFAULT):
         u"""
         Performs a pop and coerces to a bool.
         """
@@ -217,8 +223,8 @@ class Params(MutableMapping):
         else:
             raise ValueError(u"Cannot convert variable to bool: " + value)
 
-    #overrides
-    def get(self, key     , default      = DEFAULT):
+    # overrides
+    def get(self, key, default=DEFAULT):
         u"""
         Performs the functionality associated with dict.get(key) but also checks for returned
         dicts and returns a Params object in their place with an updated history.
@@ -227,12 +233,13 @@ class Params(MutableMapping):
             try:
                 value = self.params.get(key)
             except KeyError:
-                raise ConfigurationError(u"key \"{}\" is required at location \"{}\"".format(key, self.history))
+                raise ConfigurationError(
+                    u"key \"{}\" is required at location \"{}\"".format(key, self.history))
         else:
             value = self.params.get(key, default)
         return self._check_is_dict(key, value)
 
-    def pop_choice(self, key     , choices           , default_to_first_choice       = False)       :
+    def pop_choice(self, key, choices, default_to_first_choice=False):
         u"""
         Gets the value of ``key`` in the ``params`` dictionary, ensuring that the value is one of
         the given choices. Note that this `pops` the key from params, modifying the dictionary,
@@ -260,7 +267,8 @@ class Params(MutableMapping):
         value = self.pop(key, default)
         if value not in choices:
             key_str = self.history + key
-            message = u'%s not in acceptable choices for %s: %s' % (value, key_str, unicode(choices))
+            message = u'%s not in acceptable choices for %s: %s' % (
+                value, key_str, unicode(choices))
             raise ConfigurationError(message)
         return value
 
@@ -280,7 +288,7 @@ class Params(MutableMapping):
         def log_recursively(parameters, history):
             for key, value in list(parameters.items()):
                 if isinstance(value, dict):
-                    new_local_history = history + key  + u"."
+                    new_local_history = history + key + u"."
                     log_recursively(value, new_local_history)
                 else:
                     logger.info(history + key + u" = " + unicode(value))
@@ -298,6 +306,7 @@ class Params(MutableMapping):
         Nested structure is collapsed with periods.
         """
         flat_params = {}
+
         def recurse(parameters, path):
             for key, value in list(parameters.items()):
                 newpath = path + [key]
@@ -309,14 +318,14 @@ class Params(MutableMapping):
         recurse(self.params, [])
         return flat_params
 
-    def duplicate(self)            :
+    def duplicate(self):
         u"""
         Uses ``copy.deepcopy()`` to create a duplicate (but fully distinct)
         copy of these Params.
         """
         return Params(copy.deepcopy(self.params))
 
-    def assert_empty(self, class_name     ):
+    def assert_empty(self, class_name):
         u"""
         Raises a ``ConfigurationError`` if ``self.params`` is not empty.  We take ``class_name`` as
         an argument so that the error message gives some idea of where an error happened, if there
@@ -324,7 +333,8 @@ class Params(MutableMapping):
         parameters (if there are any).
         """
         if self.params:
-            raise ConfigurationError(u"Extra parameters passed to {}: {}".format(class_name, self.params))
+            raise ConfigurationError(
+                u"Extra parameters passed to {}: {}".format(class_name, self.params))
 
     def __getitem__(self, key):
         if key in self.params:
@@ -352,11 +362,12 @@ class Params(MutableMapping):
                           loading_from_archive=self.loading_from_archive,
                           files_to_archive=self.files_to_archive)
         if isinstance(value, list):
-            value = [self._check_is_dict(new_history + u'.list', v) for v in value]
+            value = [self._check_is_dict(
+                new_history + u'.list', v) for v in value]
         return value
 
     @staticmethod
-    def from_file(params_file     , params_overrides      = u"")            :
+    def from_file(params_file, params_overrides=u""):
         u"""
         Load a `Params` object from a configuration file.
         """
@@ -371,11 +382,11 @@ class Params(MutableMapping):
 
         return Params(param_dict)
 
-    def to_file(self, params_file     , preference_orders                  = None)        :
+    def to_file(self, params_file, preference_orders=None):
         with open(params_file, u"w") as handle:
             json.dump(self.as_ordered_dict(preference_orders), handle, indent=4)
 
-    def as_ordered_dict(self, preference_orders                  = None)               :
+    def as_ordered_dict(self, preference_orders=None):
         u"""
         Returns Ordered Dict of Params from list of partial order preferences.
 
@@ -400,24 +411,26 @@ class Params(MutableMapping):
             # Makes a tuple to use for ordering.  The tuple is an index into each of the `preference_orders`,
             # followed by the key itself.  This gives us integer sorting if you have a key in one of the
             # `preference_orders`, followed by alphabetical ordering if not.
-            order_tuple = [order.index(key) if key in order else len(order) for order in preference_orders]
+            order_tuple = [order.index(key) if key in order else len(
+                order) for order in preference_orders]
             return order_tuple + [key]
 
         def order_dict(dictionary, order_func):
             # Recursively orders dictionary according to scoring order_func
             result = OrderedDict()
             for key, val in sorted(list(dictionary.items()), key=lambda item: order_func(item[0])):
-                result[key] = order_dict(val, order_func) if isinstance(val, dict) else val
+                result[key] = order_dict(
+                    val, order_func) if isinstance(val, dict) else val
             return result
 
         return order_dict(params_dict, order_func)
 
 
-def pop_choice(params                ,
-               key     ,
-               choices           ,
-               default_to_first_choice       = False,
-               history      = u"?.")       :
+def pop_choice(params,
+               key,
+               choices,
+               default_to_first_choice=False,
+               history=u"?."):
     u"""
     Performs the same function as :func:`Params.pop_choice`, but is required in order to deal with
     places that the Params object is not welcome, such as inside Keras layers.  See the docstring
@@ -428,11 +441,12 @@ def pop_choice(params                ,
     history, so you'll have to fix that in the log if you want to actually recover the logged
     parameters.
     """
-    value = Params(params, history).pop_choice(key, choices, default_to_first_choice)
+    value = Params(params, history).pop_choice(
+        key, choices, default_to_first_choice)
     return value
 
 
-def _replace_none(dictionary                )                  :
+def _replace_none(dictionary):
     for key in list(dictionary.keys()):
         if dictionary[key] == u"None":
             dictionary[key] = None
